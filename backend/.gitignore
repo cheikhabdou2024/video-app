@@ -1,0 +1,13 @@
+# Fichiers d'environnement
+.env
+.env.local
+.env.*.local
+
+# Ne pas ignorer le fichier exemple
+!.env.example
+
+# Autres fichiers à ignorer
+node_modules/
+*.log
+dist/
+build/
