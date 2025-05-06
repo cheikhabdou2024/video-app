@@ -4,10 +4,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-    depends_on:
-      - postgres
-      - redis
+    - NODE_ENV=development
+    - DB_HOST=postgres  
+    - REDIS_HOST=redis
 
   postgres:
     image: postgres:latest
