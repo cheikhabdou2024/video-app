@@ -1,8 +1,12 @@
+// backend/src/models/video.js
 module.exports = (sequelize, DataTypes) => {
   const Video = sequelize.define('Video', {
     title: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
+      validate: {
+        len: [1, 100]
+      }
     },
     url: {
       type: DataTypes.STRING,
@@ -12,20 +16,52 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     description: {
-      type: DataTypes.TEXT
+      type: DataTypes.TEXT,
+      validate: {
+        len: [0, 1000]
+      }
+    },
+    thumbnail: {
+      type: DataTypes.STRING
     },
     userId: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: false,
+      references: {
+        model: 'Users',
+        key: 'id'
+      }
+    },
+    views: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
     }
   }, {
-    timestamps: true
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['userId']
+      }
+    ]
   });
 
   Video.associate = function(models) {
+    // A video belongs to a user
     Video.belongsTo(models.User, {
       foreignKey: 'userId',
       as: 'author'
+    });
+    
+    // A video has many comments
+    Video.hasMany(models.Comment, {
+      foreignKey: 'videoId',
+      as: 'comments'
+    });
+    
+    // A video has many likes
+    Video.hasMany(models.Like, {
+      foreignKey: 'videoId',
+      as: 'likes'
     });
   };
 

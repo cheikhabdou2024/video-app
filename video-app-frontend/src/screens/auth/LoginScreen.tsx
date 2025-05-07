@@ -1,4 +1,3 @@
-// src/screens/auth/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -9,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -24,21 +22,86 @@ type Props = {
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    general?: string;
+  }>({});
   const { login, state } = useAuth();
 
+  // Validation functions
+  const validateEmail = (value: string) => {
+    if (!value.trim()) {
+      return 'Email is required';
+    }
+    // Email regex pattern
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(value)) {
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) {
+      return 'Password is required';
+    }
+    return '';
+  };
+
+  // Validate all fields
+  const validateForm = () => {
+    const newErrors = {
+      email: validateEmail(email),
+      password: validatePassword(password),
+    };
+
+    // Filter out empty error messages
+    const filteredErrors = Object.fromEntries(
+      Object.entries(newErrors).filter(([_, value]) => value !== '')
+    );
+
+    setErrors(filteredErrors);
+    return Object.keys(filteredErrors).length === 0;
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
     try {
       await login({ email, password });
+      // Login successful
     } catch (error) {
       if (error instanceof Error) {
-        Alert.alert('Login Failed', error.message);
+        // Handle specific error messages from API
+        if (typeof error === 'object' && error !== null && 'response' in error) {
+          const apiError = error as any;
+          if (apiError.response && apiError.response.data) {
+            const { data } = apiError.response;
+            
+            if (data.error === 'Invalid email or password') {
+              setErrors(prev => ({ ...prev, general: 'Invalid email or password' }));
+            } else if (data.details && Array.isArray(data.details)) {
+              // Handle validation errors from API
+              const newErrors: any = {};
+              data.details.forEach((detail: {field: string, message: string}) => {
+                newErrors[detail.field] = detail.message;
+              });
+              setErrors(prev => ({ ...prev, ...newErrors }));
+            } else {
+              setErrors(prev => ({ ...prev, general: 'Login failed. Please try again.' }));
+            }
+          } else {
+            setErrors(prev => ({ ...prev, general: 'Login failed. Please try again.' }));
+          }
+        } else {
+          setErrors(prev => ({ ...prev, general: error.message }));
+        }
       } else {
-        Alert.alert('Login Failed', 'An unknown error occurred');
+        setErrors(prev => ({ ...prev, general: 'Login failed. Please try again.' }));
       }
     }
   };
@@ -52,26 +115,46 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.title}>TikTok Clone</Text>
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
+        {errors.general && <Text style={styles.errorText}>{errors.general}</Text>}
         {state.error && <Text style={styles.errorText}>{state.error}</Text>}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#888"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, errors.email ? styles.inputError : null]}
+            placeholder="Email"
+            placeholderTextColor="#888"
+            value={email}
+            onChangeText={text => {
+              setEmail(text);
+              if (errors.email) {
+                setErrors(prev => ({ ...prev, email: undefined }));
+              }
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
+          />
+          {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#888"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.input, errors.password ? styles.inputError : null]}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={text => {
+              setPassword(text);
+              if (errors.password) {
+                setErrors(prev => ({ ...prev, password: undefined }));
+              }
+            }}
+            secureTextEntry
+            textContentType="password"
+          />
+          {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+        </View>
 
         <TouchableOpacity
           style={styles.loginButton}
@@ -118,6 +201,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 32,
   },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
   input: {
     width: '100%',
     height: 50,
@@ -126,7 +213,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     color: '#fff',
-    marginBottom: 16,
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: '#ff4757',
+  },
+  errorText: {
+    color: '#ff4757',
+    marginTop: 4,
+    fontSize: 12,
+    textAlign: 'left',
+    alignSelf: 'stretch',
   },
   loginButton: {
     width: '100%',
@@ -141,11 +238,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
-  },
-  errorText: {
-    color: '#ff4757',
-    marginBottom: 16,
-    textAlign: 'center',
   },
   registerContainer: {
     flexDirection: 'row',
