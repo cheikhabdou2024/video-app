@@ -38,7 +38,7 @@ const register = async (req, res) => {
     // 3. Generate JWT token
     const token = jwt.sign(
       { id: user.id },
-      process.env.JWT_SECRET || 'your_jwt_secret_key',
+      process.env.JWT_SECRET || '3c3f7d5a9b2e4f6c8a1d0e7b5c9f3a8d',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
@@ -82,20 +82,50 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // 2. Compare passwords
-    const validPassword = await bcrypt.compare(req.body.password, user.password);
+    // 2. Check if password exists in the user record
+    if (!user.password) {
+      console.error('User found but password hash is missing for user:', user.email);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // 3. Ensure password input exists
+    if (!req.body.password) {
+      return res.status(401).json({ error: 'Password is required' });
+    }
+
+    // 4. Compare passwords with additional error handling
+    let validPassword = false;
+    try {
+      validPassword = await bcrypt.compare(req.body.password, user.password);
+    } catch (bcryptError) {
+      console.error('bcrypt.compare error:', bcryptError.message);
+      
+      // This is where your current error is happening
+      if (bcryptError.message.includes('data and hash arguments required')) {
+        console.error('Debug info:', { 
+          passwordProvided: !!req.body.password, 
+          passwordLength: req.body.password ? req.body.password.length : 0,
+          hashProvided: !!user.password,
+          hashLength: user.password ? user.password.length : 0 
+        });
+        return res.status(500).json({ error: 'Authentication error. Please contact support.' });
+      }
+      
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // 3. Generate token
+    // 5. Generate token
     const token = jwt.sign(
       { id: user.id },
       process.env.JWT_SECRET || 'your_jwt_secret_key',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    // 4. Send response
+    // 6. Send response
     res.json({
       id: user.id,
       username: user.username,
